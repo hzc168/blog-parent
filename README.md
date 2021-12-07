@@ -543,6 +543,360 @@ CREATE TABLE `blog`.`ms_sys_user`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 16 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 ```
 
+##### 3.2.2 新建实体类
+
+entity层，别名：model层，domain层
+
+用途：实体层，用于存放我们的实体类，与数据库中的属性值基本保持一致，实现set和get的方法。
+
+**创建文章类**
+
+`com.hzc.blogapi.dao.pojo`
+
+```java
+package com.hzc.blogapi.dao.pojo;
+
+import lombok.Data;
+
+@Data
+public class Article {
+
+    public static final int Article_TOP = 1;
+
+    public static final int Article_Common = 0;
+
+    private Long id;
+
+    private String title;
+
+    private String summary;
+
+    private int commentCounts;
+
+    private int viewCounts;
+
+    /**
+     * 作者id
+     */
+    private Long authorId;
+
+    /**
+     * 內容id
+     */
+    private Long bodyId;
+
+    /**
+     * 置頂
+     */
+    private int weight = Article_Common;
+
+    /**
+     * 创建时间
+     */
+    private Long createDate;
+
+}
+```
+
+**创建用户类**
+
+`com.hzc.blogapi.dao.pojo.SysUser`
+
+```java
+package com.hzc.blogapi.dao.pojo;
+
+import lombok.Data;
+
+@Data
+public class SysUser {
+
+    private Long id;
+
+    private String account;
+
+    private Integer admin;
+
+    private String avatar;
+
+    private Long createDate;
+
+    private Integer deleted;
+
+    private String email;
+
+    private Long lastLogin;
+
+    private String mobilePhoneNumber;
+
+    private String nickname;
+
+    private String password;
+
+    private String salt;
+
+    private String status;
+
+}
+```
+
+**创建标签类**
+
+`com.hzc.blogapi.dao.pojo.Tag`
+
+```java
+package com.hzc.blogapi.dao.pojo;
+
+import lombok.Data;
+
+@Data
+public class Tag {
+
+    private Long id;
+
+    private String avatar;
+
+    private String tagName;
+
+}
+```
+
+
+
+#### 接口实现思路
+
+1. 新建负责业务调度的controller，
+
+   `com.hzc.blogapi.controller.ArticleController`
+
+   ```java
+   @RestController
+   @RequestMapping("articles")
+   public class ArticleController {
+   
+       @PostMapping
+       public void listArticle() {
+   
+       }
+   
+   }
+   ```
+
+   
+
+2. 接口接收两个参数，page，pageSize。定义一个参数类
+
+   `com.hzc.blogapi.vo.params.PageParams`
+
+   ```java
+   @Data
+   public class PageParams {
+   
+       private int page = 1;
+   
+       private int pageSize = 10;
+   
+   }
+   ```
+
+3. 我们接口返回的类型基本一致，所以我们可以建立一个统一结果类。
+
+   `com.hzc.blogapi.vo.Result`
+
+   ```java
+   package com.hzc.blogapi.vo;
+   
+   import lombok.AllArgsConstructor;
+   import lombok.Data;
+   import lombok.NoArgsConstructor;
+   
+   @Data
+   @AllArgsConstructor
+   @NoArgsConstructor
+   public class Result {
+   
+       private boolean success;
+   
+       private int code;
+   
+       private String msg;
+   
+       private Object data;
+   
+       public static Result success(Object data) {
+           return new Result(true,200,"success",data);
+       }
+       public static Result fail(Integer code, String msg) {
+           return new Result(false, code, msg, null);
+       }
+   }
+   ```
+
+4. 此时，我们应当返回接口请求数据，我们的ArticleController应当如此：
+
+   ```java
+   @RestController
+   @RequestMapping("articles")
+   public class ArticleController {
+   
+       @PostMapping
+       public Result listArticle(@RequestBody PageParams pageParams) {
+           return Result.success(结果数据);
+       }
+   
+   }
+   ```
+
+5. 但是，我们该如何得到结果数据，以及如何处理业务逻辑。
+
+   此时，我们可以添加service层。
+
+   ```java
+   @RestController
+   @RequestMapping("articles")
+   public class ArticleController {
+   
+       @PostMapping
+       public Result listArticle(@RequestBody PageParams pageParams) {
+           return articleService.listArticle(pageParams);
+       }
+   
+   }
+   ```
+
+   新建`ArticleService`接口，`com.hzc.blogapi.service.ArticleService`
+
+   ```java
+   package com.hzc.blogapi.service;
+   
+   import com.hzc.blogapi.vo.Result;
+   import com.hzc.blogapi.vo.params.PageParams;
+   
+   public interface ArticleService {
+       /**
+        * 分页查询文章列表
+        * @param pageParams
+        * @return
+        */
+   
+       Result listArticle(PageParams pageParams);
+   }
+   ```
+
+   文章实现类 `com.hzc.blogapi.service.impl.ArticleServiceImpl`
+
+   ```java
+   
+   @Service
+   public class ArticleServiceImpl implements ArticleService {
+   
+       // 注入对数据层对访问
+       @Resource
+       private ArticleMapper articleMapper;
+   
+       @Override
+       public Result listArticle(PageParams pageParams) {
+           /**
+            * 1. 分页查询 article 数据库表
+            * 2. 定义查询条件
+            * 3. 是否需要排序
+            * 4. 查询
+            * 5. 对数据库返回数据进行处理
+            * 6. 返回结果
+            */
+           // 分页查询
+           Page<Article> page = new Page<>(pageParams.getPage(), pageParams.getPageSize());
+           // 查询条件
+           LambdaQueryWrapper<Article> queryWrapper = new LambdaQueryWrapper<>();
+           // 排序 时间排序 是否置顶排序(weight)
+           // order by create_date desc
+           queryWrapper.orderByDesc(Article::getWeight, Article::getCreateDate);
+           // 传入查询条件 进行查询
+           Page<Article> articlePage = articleMapper.selectPage(page, queryWrapper);
+           List<Article> records = articlePage.getRecords();
+           // 目前还不能直接返回，因为此时对records数据存在许多类型不同，需要通过vo层对数据处理和前端交互
+           List<ArticleVo> articleVoList = copyList(records);
+           return Result.success(articleVoList);
+       }
+   
+       private List<ArticleVo> copyList(List<Article> records) {
+           List<ArticleVo> articleVoList = new ArrayList<>();
+   
+           for(Article record : records) {
+               articleVoList.add(copy(record));
+           }
+   
+           return articleVoList;
+       }
+   
+       // eop的作用是对应copyList，集合之间的copy分解成集合元素之间的copy
+       private ArticleVo copy(Article article) {
+           ArticleVo articleVo = new ArticleVo();
+           BeanUtils.copyProperties(article, articleVo);
+           articleVo.setCreateDate(new DateTime(article.getCreateDate()).toString("yyyy-MM-dd HH:mm"));
+           return articleVo;
+       }
+   
+   }
+   
+   ```
+
+6. 补充mapper层，`com.hzc.blogapi.dao.mapper.ArticleMapper`
+
+   ```java
+   package com.hzc.blogapi.dao.mapper;
+   
+   import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+   import com.hzc.blogapi.dao.pojo.Article;
+   
+   public interface ArticleMapper extends BaseMapper<Article> {
+   }
+   ```
+
+   
+
+7. 补充 `ArticleVo`，`com.hzc.blogapi.vo.ArticleVo`
+
+   ```java
+   package com.hzc.blogapi.vo;
+   
+   import lombok.Data;
+   
+   import java.util.List;
+   
+   @Data
+   public class ArticleVo {
+       private String id;
+   
+       private String title;
+   
+       private String summary;
+   
+       private Integer commentCounts;
+   
+       private Integer viewCounts;
+   
+       private Integer weight;
+       /**
+        * 创建时间
+        */
+       private String createDate;
+   
+       private String author;
+   
+   //    private ArticleBodyVo body;
+   
+       private List<TagVo> tags;
+   
+   //    private CategoryVo category;
+   }
+   ```
+
+   
+
+此时articles可以正常的出来了。
+
+
+
 
 
 
