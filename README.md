@@ -310,3 +310,196 @@ public class BlogApiApplication {
 }
 ```
 
+### 3. 首页-文章列表
+
+#### 3.1 接口说明
+
+##### 接口描述
+
+##### 请求
+
+- **请求语法**
+
+  ```http
+  POST /articles HTTP/1.1
+  ```
+
+- **请求参数**
+
+  > 无
+
+- **请求内容**
+
+  ```json
+  {
+      page,
+      pageSize
+  }
+  ```
+  
+- **请求内容参数**
+
+  > pageSize：类型int
+  >
+  > 每页显示的数量 page：类型int， 当前页数
+
+##### 响应
+
+- **响应内容**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": [
+          {
+              "id": 1,
+              "title": "springboot介绍以及入门案例",
+              "summary": "通过Spring Boot实现的服务，只需要依靠一个Java类，把它打包成jar，并通过`java -jar`命令就可以运行起来。\r\n\r\n这一切相较于传统Spring应用来说，已经变得非常的轻便、简单。",
+              "commentCounts": 2,
+              "viewCounts": 54,
+              "weight": 1,
+              "createDate": "2609-06-26 15:58",
+              "author": "12",
+              "body": null,
+              "tags": [
+                  {
+                      "id": 5,
+                      "avatar": null,
+                      "tagName": "444"
+                  }
+              ],
+              "categorys": null
+          }
+      ]
+  }
+  ```
+  
+- **响应内容参数**
+
+  > code：类型`int`，状态码，200表示成功；
+
+##### 示例
+
+- **请求示例**
+
+  ```http
+  POST /articles HTTP/1.1
+  ```
+
+  ```json
+  {
+      page: 1,
+      pageSize: 10
+  }
+  ```
+
+  
+
+- **响应示例**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": [
+          {
+              "id": 1,
+              "title": "springboot介绍以及入门案例",
+              "summary": "通过Spring Boot实现的服务，只需要依靠一个Java类，把它打包成jar，并通过`java -jar`命令就可以运行起来。\r\n\r\n这一切相较于传统Spring应用来说，已经变得非常的轻便、简单。",
+              "commentCounts": 2,
+              "viewCounts": 54,
+              "weight": 1,
+              "createDate": "2609-06-26 15:58",
+              "author": "12",
+              "body": null,
+              "tags": [
+                  {
+                      "id": 5,
+                      "avatar": null,
+                      "tagName": "444"
+                  },
+                  {
+                      "id": 7,
+                      "avatar": null,
+                      "tagName": "22"
+                  },
+                  {
+                      "id": 8,
+                      "avatar": null,
+                      "tagName": "11"
+                  }
+              ],
+              "categorys": null
+          },
+          {
+              "id": 9,
+              "title": "Vue.js 是什么",
+              "summary": "Vue (读音 /vjuː/，类似于 view) 是一套用于构建用户界面的渐进式框架。",
+              "commentCounts": 0,
+              "viewCounts": 3,
+              "weight": 0,
+              "createDate": "2609-06-27 11:25",
+              "author": "12",
+              "body": null,
+              "tags": [
+                  {
+                      "id": 7,
+                      "avatar": null,
+                      "tagName": "22"
+                  }
+              ],
+              "categorys": null
+          },
+          {
+              "id": 10,
+              "title": "Element相关",
+              "summary": "本节将介绍如何在项目中使用 Element。",
+              "commentCounts": 0,
+              "viewCounts": 3,
+              "weight": 0,
+              "createDate": "2609-06-27 11:25",
+              "author": "12",
+              "body": null,
+              "tags": [
+                  {
+                      "id": 5,
+                      "avatar": null,
+                      "tagName": "444"
+                  },
+                  {
+                      "id": 6,
+                      "avatar": null,
+                      "tagName": "33"
+                  },
+                  {
+                      "id": 7,
+                      "avatar": null,
+                      "tagName": "22"
+                  },
+                  {
+                      "id": 8,
+                      "avatar": null,
+                      "tagName": "11"
+                  }
+              ],
+              "categorys": null
+          }
+      ]
+  }
+  ```
+
+  
+
+
+
+
+
+
+
+
+
+
+
