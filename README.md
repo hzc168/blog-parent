@@ -664,240 +664,677 @@ public class Tag {
 
 #### 接口实现思路
 
-1. 新建负责业务调度的controller，
+##### 1. 新建负责业务调度的controller，
 
-   `com.hzc.blogapi.controller.ArticleController`
+`com.hzc.blogapi.controller.ArticleController`
 
-   ```java
-   @RestController
-   @RequestMapping("articles")
-   public class ArticleController {
-   
-       @PostMapping
-       public void listArticle() {
-   
-       }
-   
-   }
-   ```
+```java
+@RestController
+@RequestMapping("articles")
+public class ArticleController {
 
-   
+    @PostMapping
+    public void listArticle() {
 
-2. 接口接收两个参数，page，pageSize。定义一个参数类
+    }
 
-   `com.hzc.blogapi.vo.params.PageParams`
+}
+```
 
-   ```java
-   @Data
-   public class PageParams {
-   
-       private int page = 1;
-   
-       private int pageSize = 10;
-   
-   }
-   ```
 
-3. 我们接口返回的类型基本一致，所以我们可以建立一个统一结果类。
 
-   `com.hzc.blogapi.vo.Result`
+##### 2. 接口接收两个参数，page，pageSize。定义一个参数类
 
-   ```java
-   package com.hzc.blogapi.vo;
-   
-   import lombok.AllArgsConstructor;
-   import lombok.Data;
-   import lombok.NoArgsConstructor;
-   
-   @Data
-   @AllArgsConstructor
-   @NoArgsConstructor
-   public class Result {
-   
-       private boolean success;
-   
-       private int code;
-   
-       private String msg;
-   
-       private Object data;
-   
-       public static Result success(Object data) {
-           return new Result(true,200,"success",data);
-       }
-       public static Result fail(Integer code, String msg) {
-           return new Result(false, code, msg, null);
-       }
-   }
-   ```
+`com.hzc.blogapi.vo.params.PageParams`
 
-4. 此时，我们应当返回接口请求数据，我们的ArticleController应当如此：
+```java
+@Data
+public class PageParams {
 
-   ```java
-   @RestController
-   @RequestMapping("articles")
-   public class ArticleController {
-   
-       @PostMapping
-       public Result listArticle(@RequestBody PageParams pageParams) {
-           return Result.success(结果数据);
-       }
-   
-   }
-   ```
+    private int page = 1;
 
-5. 但是，我们该如何得到结果数据，以及如何处理业务逻辑。
+    private int pageSize = 10;
 
-   此时，我们可以添加service层。
+}
+```
 
-   ```java
-   @RestController
-   @RequestMapping("articles")
-   public class ArticleController {
-   
-       @PostMapping
-       public Result listArticle(@RequestBody PageParams pageParams) {
-           return articleService.listArticle(pageParams);
-       }
-   
-   }
-   ```
+##### 3. 我们接口返回的类型基本一致，所以我们可以建立一个统一结果类。
 
-   新建`ArticleService`接口，`com.hzc.blogapi.service.ArticleService`
+`com.hzc.blogapi.vo.Result`
 
-   ```java
-   package com.hzc.blogapi.service;
-   
-   import com.hzc.blogapi.vo.Result;
-   import com.hzc.blogapi.vo.params.PageParams;
-   
-   public interface ArticleService {
-       /**
-        * 分页查询文章列表
-        * @param pageParams
-        * @return
-        */
-   
-       Result listArticle(PageParams pageParams);
-   }
-   ```
+```java
+package com.hzc.blogapi.vo;
 
-   文章实现类 `com.hzc.blogapi.service.impl.ArticleServiceImpl`
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-   ```java
-   
-   @Service
-   public class ArticleServiceImpl implements ArticleService {
-   
-       // 注入对数据层对访问
-       @Resource
-       private ArticleMapper articleMapper;
-   
-       @Override
-       public Result listArticle(PageParams pageParams) {
-           /**
-            * 1. 分页查询 article 数据库表
-            * 2. 定义查询条件
-            * 3. 是否需要排序
-            * 4. 查询
-            * 5. 对数据库返回数据进行处理
-            * 6. 返回结果
-            */
-           // 分页查询
-           Page<Article> page = new Page<>(pageParams.getPage(), pageParams.getPageSize());
-           // 查询条件
-           LambdaQueryWrapper<Article> queryWrapper = new LambdaQueryWrapper<>();
-           // 排序 时间排序 是否置顶排序(weight)
-           // order by create_date desc
-           queryWrapper.orderByDesc(Article::getWeight, Article::getCreateDate);
-           // 传入查询条件 进行查询
-           Page<Article> articlePage = articleMapper.selectPage(page, queryWrapper);
-           List<Article> records = articlePage.getRecords();
-           // 目前还不能直接返回，因为此时对records数据存在许多类型不同，需要通过vo层对数据处理和前端交互
-           List<ArticleVo> articleVoList = copyList(records);
-           return Result.success(articleVoList);
-       }
-   
-       private List<ArticleVo> copyList(List<Article> records) {
-           List<ArticleVo> articleVoList = new ArrayList<>();
-   
-           for(Article record : records) {
-               articleVoList.add(copy(record));
-           }
-   
-           return articleVoList;
-       }
-   
-       // eop的作用是对应copyList，集合之间的copy分解成集合元素之间的copy
-       private ArticleVo copy(Article article) {
-           ArticleVo articleVo = new ArticleVo();
-           BeanUtils.copyProperties(article, articleVo);
-           articleVo.setCreateDate(new DateTime(article.getCreateDate()).toString("yyyy-MM-dd HH:mm"));
-           return articleVo;
-       }
-   
-   }
-   
-   ```
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class Result {
 
-6. 补充mapper层，`com.hzc.blogapi.dao.mapper.ArticleMapper`
+    private boolean success;
 
-   ```java
-   package com.hzc.blogapi.dao.mapper;
-   
-   import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-   import com.hzc.blogapi.dao.pojo.Article;
-   
-   public interface ArticleMapper extends BaseMapper<Article> {
-   }
-   ```
+    private int code;
 
-   
+    private String msg;
 
-7. 补充 `ArticleVo`，`com.hzc.blogapi.vo.ArticleVo`
+    private Object data;
 
-   ```java
-   package com.hzc.blogapi.vo;
-   
-   import lombok.Data;
-   
-   import java.util.List;
-   
-   @Data
-   public class ArticleVo {
-       private String id;
-   
-       private String title;
-   
-       private String summary;
-   
-       private Integer commentCounts;
-   
-       private Integer viewCounts;
-   
-       private Integer weight;
-       /**
-        * 创建时间
-        */
-       private String createDate;
-   
-       private String author;
-   
-   //    private ArticleBodyVo body;
-   
-       private List<TagVo> tags;
-   
-   //    private CategoryVo category;
-   }
-   ```
+    public static Result success(Object data) {
+        return new Result(true,200,"success",data);
+    }
+    public static Result fail(Integer code, String msg) {
+        return new Result(false, code, msg, null);
+    }
+}
+```
 
-   
+##### 4. 此时，我们应当返回接口请求数据，我们的ArticleController应当如此：
+
+```java
+@RestController
+@RequestMapping("articles")
+public class ArticleController {
+
+    @PostMapping
+    public Result listArticle(@RequestBody PageParams pageParams) {
+        return Result.success(结果数据);
+    }
+
+}
+```
+
+##### 5. 但是，我们该如何得到结果数据，以及如何处理业务逻辑。
+
+此时，我们可以添加service层。
+
+```java
+@RestController
+@RequestMapping("articles")
+public class ArticleController {
+
+    @PostMapping
+    public Result listArticle(@RequestBody PageParams pageParams) {
+        return articleService.listArticle(pageParams);
+    }
+
+}
+```
+
+新建`ArticleService`接口，`com.hzc.blogapi.service.ArticleService`
+
+```java
+package com.hzc.blogapi.service;
+
+import com.hzc.blogapi.vo.Result;
+import com.hzc.blogapi.vo.params.PageParams;
+
+public interface ArticleService {
+    /**
+     * 分页查询文章列表
+     * @param pageParams
+     * @return
+     */
+
+    Result listArticle(PageParams pageParams);
+}
+```
+
+文章实现类 `com.hzc.blogapi.service.impl.ArticleServiceImpl`
+
+```java
+
+@Service
+public class ArticleServiceImpl implements ArticleService {
+
+    // 注入对数据层对访问
+    @Resource
+    private ArticleMapper articleMapper;
+
+    @Override
+    public Result listArticle(PageParams pageParams) {
+        /**
+         * 1. 分页查询 article 数据库表
+         * 2. 定义查询条件
+         * 3. 是否需要排序
+         * 4. 查询
+         * 5. 对数据库返回数据进行处理
+         * 6. 返回结果
+         */
+        // 分页查询
+        Page<Article> page = new Page<>(pageParams.getPage(), pageParams.getPageSize());
+        // 查询条件
+        LambdaQueryWrapper<Article> queryWrapper = new LambdaQueryWrapper<>();
+        // 排序 时间排序 是否置顶排序(weight)
+        // order by create_date desc
+        queryWrapper.orderByDesc(Article::getWeight, Article::getCreateDate);
+        // 传入查询条件 进行查询
+        Page<Article> articlePage = articleMapper.selectPage(page, queryWrapper);
+        List<Article> records = articlePage.getRecords();
+        // 目前还不能直接返回，因为此时对records数据存在许多类型不同，需要通过vo层对数据处理和前端交互
+        List<ArticleVo> articleVoList = copyList(records);
+        return Result.success(articleVoList);
+    }
+
+    private List<ArticleVo> copyList(List<Article> records) {
+        List<ArticleVo> articleVoList = new ArrayList<>();
+
+        for(Article record : records) {
+            articleVoList.add(copy(record));
+        }
+
+        return articleVoList;
+    }
+
+    // eop的作用是对应copyList，集合之间的copy分解成集合元素之间的copy
+    private ArticleVo copy(Article article) {
+        ArticleVo articleVo = new ArticleVo();
+        BeanUtils.copyProperties(article, articleVo);
+        articleVo.setCreateDate(new DateTime(article.getCreateDate()).toString("yyyy-MM-dd HH:mm"));
+        return articleVo;
+    }
+
+}
+
+```
+
+##### 6. 补充mapper层，`com.hzc.blogapi.dao.mapper.ArticleMapper`
+
+```java
+package com.hzc.blogapi.dao.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.hzc.blogapi.dao.pojo.Article;
+
+public interface ArticleMapper extends BaseMapper<Article> {
+}
+```
+
+
+
+##### 7. 补充 `ArticleVo`，`com.hzc.blogapi.vo.ArticleVo`
+
+```java
+package com.hzc.blogapi.vo;
+
+import lombok.Data;
+
+import java.util.List;
+
+@Data
+public class ArticleVo {
+    private String id;
+
+    private String title;
+
+    private String summary;
+
+    private Integer commentCounts;
+
+    private Integer viewCounts;
+
+    private Integer weight;
+    /**
+     * 创建时间
+     */
+    private String createDate;
+
+    private String author;
+
+//    private ArticleBodyVo body;
+
+    private List<TagVo> tags;
+
+//    private CategoryVo category;
+}
+```
+
+
 
 此时articles可以正常的出来了。
 
+#### 文章列表添加作者和标签
+
+##### 3.2.3 Controller
+
+控制器，导入service层。
+
+Controller是负责业务调度的，所以在这一层写一些业务的调度代码，而具体的业务处理应放在service中去写，而且service不单纯是对于dao的增删改查的调用，service是业务层，所以应该更切近与具体业务功能要求，所以在这一层，一个方法锁体现的是一个可以对外提供的功能，比如购物商城中的生成订单方法，这里面就不简单是增加个订单记录那么简单，我们需要查询库存，核对商品等一系列实际业务逻辑的处理；
+
+**文章Controller**
+
+`com.hzc.blogapi.controller.ArticleController`
+
+```java
+package com.hzc.blogapi.controller;
+
+import com.hzc.blogapi.service.ArticleService;
+import com.hzc.blogapi.vo.ArticleVo;
+import com.hzc.blogapi.vo.Result;
+import com.hzc.blogapi.vo.params.PageParams;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("articles")
+public class ArticleController {
+
+    @Autowired
+    private ArticleService articleService;
+    // Result是统一结果返回
+    @PostMapping
+    public Result articles(@RequestBody PageParams pageParams) {
+        // ArticleVo 页面接收的数据
+        List<ArticleVo> articles = articleService.listArticlesPage(pageParams);
+
+        return Result.success(articles);
+    }
+
+}
+```
 
 
 
+##### 3.2.5 建立与前端交互的Vo文件
+
+**文章vo**
+
+`com.hzc.blogapi.vo.ArticleVo`
+
+```java
+package com.hzc.blogapi.vo;
+
+import lombok.Data;
+
+import java.util.List;
+
+@Data
+public class ArticleVo {
+    private String id;
+
+    private String title;
+
+    private String summary;
+
+    private Integer commentCounts;
+
+    private Integer viewCounts;
+
+    private Integer weight;
+    /**
+     * 创建时间
+     */
+    private String createDate;
+
+    private String author;
+
+//    private ArticleBodyVo body;
+
+    private List<TagVo> tags;
+
+//    private CategoryVo category;
+}
+```
+
+**用户vo**
+
+`com.hzc.blogapi.vo.SysUserVo`
+
+```java
+package com.hzc.blogapi.vo;
+
+import lombok.Data;
+
+@Data
+public class SysUserVo {
+    private String nickname;
+
+    private String avatar;
+
+    private String id;
+}
+
+```
+
+**标签vo**
+
+`com.hzc.blogapi.vo`
+
+```java
+package com.hzc.blogapi.vo;
+
+import lombok.Data;
+
+@Data
+public class TagVo {
+
+    private String id;
+
+    private String tagName;
+
+    private String avatar;
+}
+```
+
+##### 3.2.6 Service
+
+service层主要是写业务逻辑方法，service层经常要调用dao层（也叫mapper层）的方法对数据进行增删改查的操作。
+
+**文章Service**
+
+`com.hzc.blogapi.service.ArticleService`
+
+```java
+package com.hzc.blogapi.service;
+
+import com.hzc.blogapi.vo.ArticleVo;
+import com.hzc.blogapi.vo.params.PageParams;
+
+import java.util.List;
+
+public interface ArticleService {
+
+    /**
+     * 分页查询文章列表
+     * @param pageParams
+     * @return
+     */
+    
+    List<ArticleVo> listArticle(PageParams pageParams);
+
+}
+```
+
+`com.hzc.blogapi.service.impl.ArticleServiceImpl`
+
+```java
+package com.hzc.blogapi.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.hzc.blogapi.dao.mapper.ArticleMapper;
+import com.hzc.blogapi.dao.pojo.Article;
+import com.hzc.blogapi.service.ArticleService;
+import com.hzc.blogapi.service.SysUserService;
+import com.hzc.blogapi.service.TagService;
+import com.hzc.blogapi.vo.ArticleVo;
+import com.hzc.blogapi.vo.Result;
+import com.hzc.blogapi.vo.params.PageParams;
+import org.joda.time.DateTime;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class ArticleServiceImpl implements ArticleService {
+
+    // 注入对数据层对访问
+    @Autowired
+    private ArticleMapper articleMapper;
+
+    @Autowired
+    private SysUserService sysUserService;
+
+    @Autowired
+    private TagService tagService;
+
+    @Override
+    public Result listArticle(PageParams pageParams) {
+        /**
+         * 1. 分页查询 article 数据库表
+         * 2. 定义查询条件
+         * 3. 是否需要排序
+         * 4. 查询
+         * 5. 对数据库返回数据进行处理
+         * 6. 返回结果
+         */
+        // 分页查询
+        Page<Article> page = new Page<>(pageParams.getPage(), pageParams.getPageSize());
+        // 查询条件
+        LambdaQueryWrapper<Article> queryWrapper = new LambdaQueryWrapper<>();
+        // 排序 时间排序 是否置顶排序(weight)
+        // order by create_date desc
+        queryWrapper.orderByDesc(Article::getWeight, Article::getCreateDate);
+        // 传入查询条件 进行查询
+        Page<Article> articlePage = articleMapper.selectPage(page, queryWrapper);
+        List<Article> records = articlePage.getRecords();
+        // 目前还不能直接返回，因为此时对records数据存在许多类型不同，需要通过vo层对数据处理和前端交互
+        List<ArticleVo> articleVoList = copyList(records, true, true);
+        return Result.success(articleVoList);
+    }
+
+    private List<ArticleVo> copyList(List<Article> records, boolean isTag, boolean isAuthor) {
+        List<ArticleVo> articleVoList = new ArrayList<>();
+
+        for(Article record : records) {
+            articleVoList.add(copy(record, isTag, isAuthor));
+        }
+
+        return articleVoList;
+    }
+
+    // eop的作用是对应copyList，集合之间的copy分解成集合元素之间的copy
+    private ArticleVo copy(Article article, boolean isTag, boolean isAuthor) {
+        ArticleVo articleVo = new ArticleVo();
+        BeanUtils.copyProperties(article, articleVo);
+        articleVo.setCreateDate(new DateTime(article.getCreateDate()).toString("yyyy-MM-dd HH:mm"));
+        // 并不是所有的接口都需要标签和作者信息
+        if(isTag) {
+            Long articleId = article.getId();
+            articleVo.setTags(tagService.findTagsByArticleId(articleId));
+        }
+        if(isAuthor) {
+            // 拿到作者id
+            Long authorId = article.getAuthorId();
+
+            articleVo.setAuthor(sysUserService.findUserById(authorId).getNickname());
+        }
+        return articleVo;
+    }
+
+}
+```
+
+**用户service**
+
+`com.hzc.blogapi.service.SysUserService`
+
+```java
+package com.hzc.blogapi.service;
+
+import com.hzc.blogapi.dao.pojo.SysUser;
+
+public interface SysUserService {
+    SysUser findUserById(Long userId);
+}
+```
+
+实现类：
+
+`com.hzc.blogapi.service.impl.SysUserServiceImpl`
+
+```java
+package com.hzc.blogapi.service.impl;
+
+import com.hzc.blogapi.dao.mapper.SysUserMapper;
+import com.hzc.blogapi.dao.pojo.SysUser;
+import com.hzc.blogapi.service.SysUserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class SysUserServiceImpl implements SysUserService {
+
+    @Autowired
+    private SysUserMapper sysUserMapper;
+
+    @Override
+    public SysUser findUserById(Long userId) {
+        SysUser sysUser = sysUserMapper.selectById(userId);
+        if(sysUser == null) {
+            sysUser = new SysUser();
+            sysUser.setNickname("博客系统");
+        }
+        return sysUser;
+    }
+
+}
+```
+
+**标签service**
+
+`com.hzc.blogapi.service.TagService`
+
+```java
+package com.hzc.blogapi.service;
+
+import com.hzc.blogapi.vo.TagVo;
+
+import java.util.List;
+
+public interface TagService {
+    List<TagVo> findTagsByArticleId(Long id);
+}
+```
+
+实现类：
+
+`com.hzc.blogapi.service.impl.TagsServiceImpl`
+
+```java
+package com.hzc.blogapi.service.impl;
+
+import com.hzc.blogapi.dao.mapper.TagMapper;
+import com.hzc.blogapi.dao.pojo.Tag;
+import com.hzc.blogapi.service.TagService;
+import com.hzc.blogapi.vo.TagVo;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class TagsServiceImpl implements TagService {
+
+    @Autowired
+    private TagMapper tagMapper;
+
+    public TagVo copy(Tag tag) {
+        TagVo tagVo = new TagVo();
+        BeanUtils.copyProperties(tag, tagVo);
+        return tagVo;
+    }
+
+    public List<TagVo> copyList(List<Tag> tagList) {
+        List<TagVo> tagVoList = new ArrayList<>();
+        for(Tag tag : tagList) {
+            tagVoList.add(copy(tag));
+        }
+        return tagVoList;
+    }
+
+    @Override
+    public List<TagVo> findTagsByArticleId(Long id) {
+        List<Tag> tags = tagMapper.findTagsByArticleId(id);
+        return copyList(tags);
+    }
+
+}
+```
+
+
+##### 3.2.7 Mapper
+
+mapper层及dao层，主要是做数据持久层的工作，负责与数据库进行联络的一些任务都封装在此。service层经常要调用dao层（mapper层）的方法对数据进行增删改查的操作。
+
+现在用mybatis逆向工程生成的mapper层，其实就是dao层。
+
+dao层对数据库进行数据持久化操作，他的方法语句是直接针对数据库操作的，而service层是针对我们controller，也就是针对我们使用者。service的impl是把mapper和service进行整合的文件。
+
+dao层和service层关系：service层经常要调用dao层的方法对数据进行增删改查的操作，现实开发中，对业务的操作会涉及到数据的操作，而对数据操作常常要用到数据库，所以service层会场景调用dao层的方法。
+
+**文章Mapper**
+
+`com.hzc.blogapi.dao.mapper.ArticleMapper`
+
+```java
+package com.hzc.blogapi.dao.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.hzc.blogapi.dao.pojo.Article;
+
+public interface ArticleMapper extends BaseMapper<Article> {
+}
+```
+
+**用户Mapper**
+
+`com.hzc.blogapi.dao.mapper.SysUserMapper`
+
+```java
+package com.hzc.blogapi.dao.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.hzc.blogapi.dao.pojo.SysUser;
+
+public interface SysUserMapper extends BaseMapper<SysUser> {
+}
+```
+
+**标签Mapper**
+
+`com.hzc.blogapi.dao.mapper.TagMapper`
+
+```java
+package com.hzc.blogapi.dao.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.hzc.blogapi.dao.pojo.Tag;
+
+import java.util.List;
+
+public interface TagMapper extends BaseMapper<Tag> {
+    List<Tag> findTagsByArticleId(Long articleId);
+}
+```
+
+##### MyBatis配置文件
+
+`com.hzc.blogapi.dao.mapper.TagMapper.xml`
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--MyBatis配置文件-->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.hzc.blogapi.dao.mapper.TagMapper">
+
+    <sql id="all">
+        id,avatar,tag_name as tagName
+    </sql>
+
+    <select id="findTagsByArticleId" parameterType="long" resultType="com.hzc.blogapi.dao.pojo.Tag">
+        select <include refid="all" />  from ms_tag
+        <where>
+            id in
+            (select tag_id from ms_article_tag where article_id = #{articleId})
+        </where>
+    </select>
+</mapper>
+```
 
 
 
