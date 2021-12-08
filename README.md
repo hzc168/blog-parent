@@ -1637,3 +1637,277 @@ public class AllExceptionHandler {
 ```
 
 
+
+### 6. 首页-最热文章
+
+#### 6.1 最热文章接口说明
+
+##### 接口描述
+
+##### 请求
+
+- **请求语法**
+
+  ```http
+  POST /articles/hot HTTP/1.1
+  ```
+
+- **请求参数**
+
+  > 无
+
+- **请求内容**
+
+  > 无
+
+- **请求内容参数**
+
+  > 无
+
+##### 响应
+
+- **响应内容**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": [
+          {
+              "id": 1,
+              "title": "springboot介绍以及入门案例",
+          },
+          {
+              "id": 9,
+              "title": "Vue.js 是什么",
+          },
+          {
+              "id": 10,
+              "title": "Element相关",
+              
+          }
+      ]
+  }
+  ```
+
+- **响应内容参数**
+
+  > code：类型`int`，状态码，200表示成功；
+
+##### 示例
+
+- **请求示例**
+
+  ```http
+  POST /articles/hot HTTP/1.1
+  ```
+
+  
+
+- **响应示例**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": [
+          {
+              "id": 1,
+              "title": "springboot介绍以及入门案例",
+          },
+          {
+              "id": 9,
+              "title": "Vue.js 是什么",
+          },
+          {
+              "id": 10,
+              "title": "Element相关",
+              
+          }
+      ]
+  }
+  ```
+
+  
+
+#### 6.2 Controller
+
+ArticleController中添加：
+
+```java
+@PostMapping("hot")
+public Result hotArticle() {
+    int limit = 5;
+    return articleService.hotArticle(limit);
+}
+```
+
+#### 6.3 Service
+
+ArticleService添加：
+
+```java
+/**
+ * 最热文章
+ * @param limit
+ * @return
+ */
+Result hotArticle(int limit);
+```
+
+ArticleService实现类中添加：
+
+```java
+@Override
+public Result hotArticle(int limit) {
+    LambdaQueryWrapper<Article> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.orderByDesc(Article::getViewCounts);
+    queryWrapper.select(Article::getId, Article::getTitle);
+    queryWrapper.last("limit " + limit);
+    // select id, title from article order by view_counts desc limit 5
+    List<Article> articles = articleMapper.selectList(queryWrapper);
+
+    return Result.success(copyList(articles, false, false));
+}
+```
+
+
+
+### 7. 首页-最新文章
+
+#### 7.1 最新文章接口说明
+
+##### 接口描述
+
+##### 请求
+
+- **请求语法**
+
+  ```http
+  POST /articles/new HTTP/1.1
+  ```
+
+- **请求参数**
+
+  > 无
+
+- **请求内容**
+
+  > 无
+
+- **请求内容参数**
+
+  > 无
+
+##### 响应
+
+- **响应内容**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": [
+          {
+              "id": 1,
+              "title": "springboot介绍以及入门案例",
+          },
+          {
+              "id": 9,
+              "title": "Vue.js 是什么",
+          },
+          {
+              "id": 10,
+              "title": "Element相关",
+              
+          }
+      ]
+  }
+  ```
+
+- **响应内容参数**
+
+  > code：类型`int`，状态码，200表示成功；
+
+##### 示例
+
+- **请求示例**
+
+  ```http
+  POST /articles/new HTTP/1.1
+  ```
+
+- **响应示例**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": [
+          {
+              "id": 1,
+              "title": "springboot介绍以及入门案例",
+          },
+          {
+              "id": 9,
+              "title": "Vue.js 是什么",
+          },
+          {
+              "id": 10,
+              "title": "Element相关",
+              
+          }
+      ]
+  }
+  ```
+
+  
+
+#### 7.2 Controller
+
+ArticleController中添加：
+
+```java
+@PostMapping("new")
+public Result newArticle() {
+    int limit = 5;
+    return articleService.newArticle(limit);
+}
+```
+
+#### 7.3 Service
+
+ArticleService添加：
+
+```java
+/**
+ * 最新文章
+ * @param limit
+ * @return
+ */
+Result newArticle(int limit);
+```
+
+ArticleService实现类中添加：
+
+```java
+@Override
+public Result newArticle(int limit) {
+    LambdaQueryWrapper<Article> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.orderByDesc(Article::getViewCounts);
+    queryWrapper.select(Article::getId, Article::getTitle);
+    queryWrapper.last("limit " + limit);
+    // select id, title from article order by view_counts desc limit 5
+    List<Article> articles = articleMapper.selectList(queryWrapper);
+
+    return Result.success(copyList(articles, false, false));
+}
+```
+
+
+
+
