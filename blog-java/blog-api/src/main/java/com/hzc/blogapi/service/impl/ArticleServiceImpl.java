@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hzc.blogapi.dao.mapper.ArticleMapper;
 import com.hzc.blogapi.dao.pojo.Article;
 import com.hzc.blogapi.service.ArticleService;
+import com.hzc.blogapi.service.SysUserService;
+import com.hzc.blogapi.service.TagService;
 import com.hzc.blogapi.vo.ArticleVo;
 import com.hzc.blogapi.vo.Result;
 import com.hzc.blogapi.vo.params.PageParams;
@@ -21,8 +23,14 @@ import java.util.List;
 public class ArticleServiceImpl implements ArticleService {
 
     // 注入对数据层对访问
-    @Resource
+    @Autowired
     private ArticleMapper articleMapper;
+
+    @Autowired
+    private SysUserService sysUserService;
+
+    @Autowired
+    private TagService tagService;
 
     @Override
     public Result listArticle(PageParams pageParams) {
@@ -45,25 +53,36 @@ public class ArticleServiceImpl implements ArticleService {
         Page<Article> articlePage = articleMapper.selectPage(page, queryWrapper);
         List<Article> records = articlePage.getRecords();
         // 目前还不能直接返回，因为此时对records数据存在许多类型不同，需要通过vo层对数据处理和前端交互
-        List<ArticleVo> articleVoList = copyList(records);
+        List<ArticleVo> articleVoList = copyList(records, true, true);
         return Result.success(articleVoList);
     }
 
-    private List<ArticleVo> copyList(List<Article> records) {
+    private List<ArticleVo> copyList(List<Article> records, boolean isTag, boolean isAuthor) {
         List<ArticleVo> articleVoList = new ArrayList<>();
 
         for(Article record : records) {
-            articleVoList.add(copy(record));
+            articleVoList.add(copy(record, isTag, isAuthor));
         }
 
         return articleVoList;
     }
 
     // eop的作用是对应copyList，集合之间的copy分解成集合元素之间的copy
-    private ArticleVo copy(Article article) {
+    private ArticleVo copy(Article article, boolean isTag, boolean isAuthor) {
         ArticleVo articleVo = new ArticleVo();
         BeanUtils.copyProperties(article, articleVo);
         articleVo.setCreateDate(new DateTime(article.getCreateDate()).toString("yyyy-MM-dd HH:mm"));
+        // 并不是所有的接口都需要标签和作者信息
+        if(isTag) {
+            Long articleId = article.getId();
+            articleVo.setTags(tagService.findTagsByArticleId(articleId));
+        }
+        if(isAuthor) {
+            // 拿到作者id
+            Long authorId = article.getAuthorId();
+
+            articleVo.setAuthor(sysUserService.findUserById(authorId).getNickname());
+        }
         return articleVo;
     }
 
