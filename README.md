@@ -1910,4 +1910,174 @@ public Result newArticle(int limit) {
 
 
 
+### 8. 首页-文章归档
+
+#### 8.1 文章归档接口说明
+
+##### 接口描述
+
+##### 请求
+
+- **请求语法**
+
+  ```http
+  POST /articles/listArchives HTTP/1.1
+  ```
+
+- **请求参数**
+
+  > 无
+
+- **请求内容**
+
+  > 无
+
+- **请求内容参数**
+
+  > 无
+
+##### 响应
+
+- **响应内容**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": [
+          {
+              "year": "2021",
+              "month": "6",
+              "count": 2
+          }
+              
+      ]
+  }
+  ```
+
+- **响应内容参数**
+
+  > code：类型`int`，状态码，200表示成功；
+
+##### 示例
+
+- **请求示例**
+
+  ```http
+  POST /articles/listArchives HTTP/1.1
+  ```
+
+
+
+  
+
+- **响应示例**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": [
+          {
+              "year": "2021",
+              "month": "6",
+              "count": 2
+          }
+              
+      ]
+  }
+  ```
+
+  
+
+select year(create_date) as year,month(create_date) as month,count(*) as count from ms_article group by year,month
+
+#### 8.2 Controller
+
+ArticleController中添加
+
+```java
+/**
+ * 首页 文章归档
+ * @return
+ */
+@PostMapping("listArchives")
+public Result listArchives() {
+    return articleService.listArchives();
+}
+```
+
+新建dos，dos非数据持久化
+
+```java
+package com.hzc.blogapi.dao.dos;
+
+import lombok.Data;
+
+@Data
+public class Archives {
+
+    private Integer year;
+
+    private Integer month;
+
+    private Integer count;
+}
+```
+
+#### 8.3 Service
+
+```java
+/**
+ * 文章归档
+ */
+Result listArchives();
+```
+
+```java
+@Override
+public Result listArchives() {
+    List<Archives> archivesList = articleMapper.listArchives();
+    return Result.success(archivesList);
+}
+```
+
+#### 8.4 Dao
+
+```java
+package com.hzc.blogapi.dao.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.hzc.blogapi.dao.pojo.Article;
+
+import java.util.List;
+import java.util.Map;
+
+public interface ArticleMapper extends BaseMapper<Article> {
+
+  List<Archives> listArchives();
+
+}
+```
+
+补充配置
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--MyBatis配置文件-->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.hzc.blogapi.dao.mapper.ArticleMapper">
+
+
+    <select id="listArchives" resultType="com.hzc.blogapi.dao.dos.Archives">
+        select year(create_date) as year,month(create_date) as month,count(*) as count from ms_article group by year,month
+    </select>
+</mapper>
+```
+
+
+
 

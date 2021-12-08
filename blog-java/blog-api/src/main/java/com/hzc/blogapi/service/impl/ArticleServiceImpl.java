@@ -14,6 +14,7 @@ import org.joda.time.DateTime;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.hzc.blogapi.dao.dos.Archives;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
@@ -111,6 +112,11 @@ public class ArticleServiceImpl implements ArticleService {
         return Result.success(copyList(articles, false, false));
     }
 
+    @Override
+    public Result listArchives() {
+        List<Archives> archivesList = articleMapper.listArchives();
+        return Result.success(archivesList);
+    }
 }
 
 
