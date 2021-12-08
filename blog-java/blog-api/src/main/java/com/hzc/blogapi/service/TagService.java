@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface TagService {
     List<TagVo> findTagsByArticleId(Long id);
+
+    List<TagVo> hot(int limit);
 }

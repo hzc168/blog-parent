@@ -1337,6 +1337,274 @@ public interface TagMapper extends BaseMapper<Tag> {
 ```
 
 
+### 4. 首页-最热标签
 
+#### 4.1 标签接口说明
+
+##### 接口描述
+
+##### 请求
+
+- **请求语法**
+
+  ```http
+  GET /tags/hot HTTP/1.1
+  ```
+
+- **请求参数**
+
+  > 无
+
+- **请求内容**
+
+  > 无
+
+- **请求内容参数**
+
+  > 无
+
+##### 响应
+
+- **响应内容**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": [
+          {
+              "id":1,
+              "tagName":"4444"
+          }
+      ]
+  }
+  ```
+
+- **响应内容参数**
+
+  > code：类型`int`，状态码，200表示成功；
+
+##### 示例
+
+- **请求示例**
+
+  ```http
+  POST /tags/hot HTTP/1.1
+  ```
+
+- **响应示例**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": [
+          {
+              "id":1,
+              "tagName":"4444"
+          }
+      ]
+  }
+  ```
+
+
+#### 4.2 编码
+
+##### 4.2.1 Controller
+
+`com.hzc.blogapi.controller.TagController`
+
+```java
+package com.hzc.blogapi.controller;
+
+import com.hzc.blogapi.service.TagService;
+import com.hzc.blogapi.vo.Result;
+import com.hzc.blogapi.vo.TagVo;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("tags")
+public class TagsController {
+
+    @Autowired
+    private TagService tagService;
+
+    @GetMapping("/hot")
+    public Result listHotTags() {
+        int limit = 6;
+        List<TagVo> tagVoList = tagService.hot(limit);
+        return Result.success(tagVoList);
+    }
+}
+```
+
+`com.hzc.blogapi.vo.TagVo`
+
+```java
+package com.hzc.blogapi.vo;
+
+import lombok.Data;
+
+@Data
+public class TagVo {
+
+    private String id;
+
+    private String tagName;
+
+    private String avatar;
+}
+```
+
+##### 4.2.2 Service
+
+`com.hzc.blogapi.service.impl.TagsServiceImpl`
+
+```java
+package com.hzc.blogapi.service.impl;
+
+import com.hzc.blogapi.dao.mapper.TagMapper;
+import com.hzc.blogapi.dao.pojo.Tag;
+import com.hzc.blogapi.service.TagService;
+import com.hzc.blogapi.vo.TagVo;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class TagsServiceImpl implements TagService {
+
+    @Autowired
+    private TagMapper tagMapper;
+
+    public TagVo copy(Tag tag) {
+        TagVo tagVo = new TagVo();
+        BeanUtils.copyProperties(tag, tagVo);
+        return tagVo;
+    }
+
+    public List<TagVo> copyList(List<Tag> tagList) {
+        List<TagVo> tagVoList = new ArrayList<>();
+        for(Tag tag : tagList) {
+            tagVoList.add(copy(tag));
+        }
+        return tagVoList;
+    }
+
+    @Override
+    public List<TagVo> findTagsByArticleId(Long id) {
+        List<Tag> tags = tagMapper.findTagsByArticleId(id);
+        return copyList(tags);
+    }
+
+  	@Override
+    public List<TagVo> hot(int limit) {
+        /**
+         * 1. 标签所拥有的文章数量最多 最热标签
+         * 2. 查询 根据tag_id 分组 计数，从大到小 排列 取前limit个
+         */
+        List<Long> tagIds = tagMapper.findHotsTagIds(limit);
+        if(CollectionUtils.isEmpty(tagIds)) {
+            return Collections.emptyList();
+        }
+        // 需要的是 tagId 和 tagName Tag对象
+        // select * from tag where id in (1, 2, 3, 4)
+        List<Tag> tagList = tagMapper.findTagsByTagIds(tagIds);
+        return copyList(tagList);
+    }
+  
+}
+```
+
+`com.hzc.blogapi.service.TagService`补充：
+
+```java
+List<TagVo> hot(int limit);
+```
+
+##### 4.2.3 Mapper
+
+```java
+package com.hzc.blogapi.dao.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.hzc.blogapi.dao.pojo.Tag;
+
+import java.util.List;
+
+public interface TagMapper extends BaseMapper<Tag> {
+    List<Tag> findTagsByTagIds(List<Long> tagIds);
+
+    /**
+     * 查询最热的标签 前n条
+     * @param limit
+     * @return
+     */
+    List<Long> findHotsTagIds(int limit);
+
+    List<Tag> findTagsByTagIds(List<Long> tagIds);
+}
+```
+
+##### Mapper配置文件
+
+`resources.com.hzc.blogapi.dao.mapper.TagMapper.xml`
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--MyBatis配置文件-->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.hzc.blogapi.dao.TagMapper">
+
+    <sql id="all">
+        id,avatar,tag_name as tagName
+    </sql>
+
+    <select id="findTagsByArticleId" parameterType="long" resultType="com.hzc.blogapi.dao.pojo.Tag">
+        select <include refid="all" />  from ms_tag
+        <where>
+            id in
+            (select tag_id from ms_article_tag where article_id = #{articleId})
+        </where>
+    </select>
+  
+  <!-- List<Long> findHotsTagIds(int limit); -->
+    <select id="findHotsTagIds" parameterType="int" resultType="java.lang.Long">
+        SELECT tag_id FROM `ms_article_tag` group by tag_id order by count(*) desc limit #{limit}
+    </select>
+
+        <!--  List<Tag> findTagsByTagIds(List<Long> tagIds);  -->
+        <select id="findTagsByTagIds" parameterType="list" resultType="com.hzc.blog.dao.pojo.Tag">
+            select id,tag_name as tagName from ms_tag
+            where id in
+            <foreach collection="tagIds" item="tagId" separator="," open="(" close=")">
+                #{tagId}
+            </foreach>
+        </select>
+</mapper>
+```
+
+### 小结
+
+#### mybatisplus遇到多表查询
+
+建立TagMapper后需要建立xml文件进行读写
+
+<img src="/Users/hzc/Library/Application Support/typora-user-images/image-20211208213631346.png" alt="image-20211208213631346" style="zoom:80%;" />
+
+#### 创建文件夹时
+
+使用IDEA创建多级文件夹时，文件夹名为`com.hzc.blogapi.dao.mapper`和`com/hzc/blogapi/dao/mapper`均会显示：`com.hzc.blogapi.dao.mapper`，但是会一个是单文件夹，一个是文件夹嵌套。
 
 
