@@ -1608,3 +1608,32 @@ public interface TagMapper extends BaseMapper<Tag> {
 使用IDEA创建多级文件夹时，文件夹名为`com.hzc.blogapi.dao.mapper`和`com/hzc/blogapi/dao/mapper`均会显示：`com.hzc.blogapi.dao.mapper`，但是会一个是单文件夹，一个是文件夹嵌套。
 
 
+
+### 5. 统一异常处理
+
+不管是controller层还是service，dao层，都有可能报异常，如果是预料中的异常，可以直接捕获处理，如果是意料之外的异常，需要统一进行处理，进行记录，并给用户提示相对比较友好的信息。
+
+` com.hzc.blogapi.handler.AllExceptionHandler`
+
+```java
+package com.hzc.blogapi.handler;
+
+import com.hzc.blogapi.vo.Result;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+// 对家了@Controller注解的方法进行拦截处理 AOP 的实现
+@ControllerAdvice
+public class AllExceptionHandler {
+    // 进行异常处理，处理Exception.class的异常
+    @ExceptionHandler(Exception.class)
+    @ResponseBody   // 返回json数据
+    public Result doException(Exception ex) {
+        ex.printStackTrace();
+        return Result.fail(-999, "系统异常");
+    }
+}
+```
+
+
