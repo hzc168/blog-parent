@@ -2078,6 +2078,604 @@ public interface ArticleMapper extends BaseMapper<Article> {
 </mapper>
 ```
 
+### 9. 登录
+
+#### 9.1 登录接口说明
+
+##### 接口描述
+
+##### 请求
+
+- **请求语法**
+
+  ```http
+  POST /login HTTP/1.1
+  ```
+
+- **请求参数**
+
+  > 无
+
+- **请求内容**
+
+  ```json
+  {
+  	account: "账号",
+      password: "密码"
+  }
+  ```
+
+- **请求内容参数**
+
+  > account：类型`string`，账号
+  >
+  > password：类型`string`，密码
+
+##### 响应
+
+- **响应内容**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": "token"
+  }
+  ```
+
+- **响应内容参数**
+
+  > code：类型`int`，状态码，200表示成功；
+
+##### 示例
+
+- **请求示例**
+
+  ```http
+  POST /login HTTP/1.1
+  ```
+
+  ```java
+  {
+  	account: "账号",
+      password: "密码"
+  }
+  ```
+
+  
+
+- **响应示例**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": "token"
+  }
+  ```
+
+  
+
+#### 9.2 JWT
+
+登录使用JWT技术。
+
+jwt 可以生成 一个加密的token，做为用户登录的令牌，当用户登录成功之后，发放给客户端。
+
+请求需要登录的资源或者接口的时候，将token携带，后端验证token是否合法。
+
+jwt 有三部分组成：A.B.C
+
+A：Header，{"type":"JWT","alg":"HS256"} 固定
+
+B：playload，存放信息，比如，用户id，过期时间等等，可以被解密，不能存放敏感信息
+
+C:  签证，A和B加上秘钥 加密而成，只要秘钥不丢失，可以认为是安全的。
+
+jwt 验证，主要就是验证C部分 是否合法。
+
+依赖包:
+
+```xml
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt</artifactId>
+    <version>0.9.1</version>
+</dependency>
+```
+
+工具类:
+
+`com.hzc.blogapi.utils.JWTUtils`
+
+```java
+package com.hzc.blogapi.utils;
+
+import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.JwtBuilder;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+public class JWTUtils {
+
+    private static final String jwtToken = "comblog1234";
+
+    public static String createToken(Long userId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        JwtBuilder jwtBuilder = Jwts.builder()
+                .signWith(SignatureAlgorithm.HS256, jwtToken)   // 签发算法，秘钥为jwtToken
+                .setClaims(claims)      // body数据，要唯一，自行设置
+                .setIssuedAt(new Date())    // 设置签发时间
+                .setExpiration(new Date(System.currentTimeMillis() + 24 * 60 * 60 * 60 * 60 * 1000));   // 一天的有效时间
+        String token = jwtBuilder.compact();
+        return token;
+    }
+
+    public static Map<String, Object> checkToken(String token) {
+        try {
+            Jwt parse = Jwts.parser().setSigningKey(jwtToken).parse(token);
+            return (Map<String, Object>) parse.getBody();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+}
+```
+
+#### 9.3 Controller
+
+`com.hzc.blogapi.controller.LoginController`
+
+```java
+package com.hzc.blogapi.controller;
+
+import com.hzc.blogapi.service.LoginService;
+import com.hzc.blogapi.vo.Result;
+import com.hzc.blogapi.vo.params.LoginParam;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("login")
+public class LoginController {
+
+    @Autowired
+    private LoginService loginService;
+
+    @PostMapping
+    public Result login(@RequestBody LoginParam loginParam) {
+        return loginService.login(loginParam);
+    }
+
+}
+```
+
+#### 9.4 Service
+
+`com.hzc.blogapi.service.LoginService`
+
+```java
+package com.hzc.blogapi.service;
+
+import com.hzc.blogapi.vo.Result;
+import com.hzc.blogapi.vo.params.LoginParam;
+
+public interface LoginService {
+    /**
+     * 登录
+     * @param loginParam
+     * @return
+     */
+    Result login(LoginParam loginParam);
+
+}
+```
+
+##### 导入MD5加密包
+
+```xml
+<dependency>
+    <groupId>commons-codec</groupId>
+    <artifactId>commons-codec</artifactId>
+</dependency>
+```
+
+实现类：
+
+`com.hzc.blogapi.service.impl.LoginServiceImpl`
+
+```java
+package com.hzc.blogapi.service.impl;
+
+import com.alibaba.fastjson.JSON;
+import com.hzc.blogapi.dao.pojo.SysUser;
+import com.hzc.blogapi.service.LoginService;
+import com.hzc.blogapi.service.SysUserService;
+import com.hzc.blogapi.utils.JWTUtils;
+import com.hzc.blogapi.vo.ErrorCode;
+import com.hzc.blogapi.vo.Result;
+import com.hzc.blogapi.vo.params.LoginParam;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.concurrent.TimeUnit;
+
+@Service
+public class LoginServiceImpl implements LoginService {
+
+    private static final String slat = "hzc!@#$";
+
+    @Autowired
+    private SysUserService sysUserService;
+
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Override
+    public Result login(LoginParam loginParam) {
+        String account = loginParam.getAccount();
+        String password = loginParam.getPassword();
+        if(StringUtils.isBlank(account) || StringUtils.isBlank(password)) {
+            return Result.fail(ErrorCode.PARAMS_ERROR.getCode(), ErrorCode.PARAMS_ERROR.getMsg());
+        }
+        String pwd = DigestUtils.md5Hex(password + slat);
+        SysUser sysUser = sysUserService.findUser(account, pwd);
+        if(sysUser == null) {
+            return Result.fail(ErrorCode.ACCOUNT_PWD_NOT_EXIST.getCode(), ErrorCode.ACCOUNT_PWD_NOT_EXIST.getMsg());
+        }
+        // 登录成功，使用JWT生成token，返回token和redis中
+        String token = JWTUtils.createToken(sysUser.getId());
+        redisTemplate.opsForValue().set("TOKEN_" + token, JSON.toJSONString(sysUser), 1, TimeUnit.DAYS);
+        return Result.success(token);
+    }
+
+    public static void main(String[] args) {
+        System.out.println(DigestUtils.md5Hex("admin" + slat));
+    }
+
+}
+```
+
+用户service，添加：
+
+`com.hzc.blogapi.service.SysUserService`
+
+```java
+SysUser findUser(String account, String pwd);
+```
+
+`com.hzc.blogapi.service.impl.SysUserServiceImpl`
+
+```java
+@Override
+public SysUser findUser(String account, String pwd) {
+    LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.eq(SysUser::getAccount, account);
+    queryWrapper.eq(SysUser::getPassword, pwd);
+
+    queryWrapper.select(SysUser::getId, SysUser::getAccount, SysUser::getAvatar, SysUser::getNickname);
+    queryWrapper.last("limit 1");
+    SysUser sysUser = sysUserMapper.selectOne(queryWrapper);
+    return sysUser;
+}
+```
+
+#### 9.5 登录参数，redis配置，统一错误码
+
+`com.hzc.blogapi.vo.params.LoginParam`
+
+```java
+package com.hzc.blogapi.vo.params;
+
+import lombok.Data;
+
+@Data
+public class LoginParam {
+
+    private String account;
+
+    private String password;
+
+    private String nickname;
+
+}
+```
+
+```properties
+spring.redis.host=localhost
+spring.redis.port=6379
+```
+
+`com.hzc.blogapi.vo.ErrorCode`
+
+```java
+package com.hzc.blogapi.vo;
+
+public enum ErrorCode {
+
+    PARAMS_ERROR(10001,"参数有误"),
+    ACCOUNT_PWD_NOT_EXIST(10002,"用户名或密码不存在"),
+    NO_PERMISSION(70001,"无访问权限"),
+    SESSION_TIME_OUT(90001,"会话超时"),
+    NO_LOGIN(90002,"未登录"),;
+
+    private int code;
+    private String msg;
+
+     ErrorCode(int code, String msg) {
+         this.code = code;
+         this.msg = msg;
+     }
+
+    public String getMsg() {
+        return msg;
+    }
+
+    public void setMsg(String msg) {
+        this.msg = msg;
+    }
+
+    public void setCode(int code) {
+        this.code = code;
+    }
+
+    public int getCode() {
+        return code;
+    }
+}
+```
+
+### 10. 注册
+
+#### 10.1 注册接口说明
+
+##### 接口描述
+
+##### 请求
+
+- **请求语法**
+
+  ```http
+  POST /register HTTP/1.1
+  ```
+
+- **请求参数**
+
+  > 无
+
+- **请求内容**
+
+  ```json
+  {
+  	account: "账号",
+      password: "密码",
+      nickname: "昵称"
+  }
+  ```
+
+- **请求内容参数**
+
+  > account：类型`string`，账号
+  >
+  > password：类型`string`，密码
+  >
+  > nickname: 类型`string`， "昵称"
+
+##### 响应
+
+- **响应内容**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": "token"
+  }
+  ```
+
+- **响应内容参数**
+
+  > code：类型`int`，状态码，200表示成功；
+
+##### 示例
+
+- **请求示例**
+
+  ```http
+  POST /login HTTP/1.1
+  ```
+
+  ```java
+  {
+  	account: "账号",
+      password: "密码",
+      nickname: "昵称"
+  }
+  ```
+
+  
+
+- **响应示例**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": "token"
+  }
+  ```
+
+  
+
+#### 10. 2 Controller
+
+`com.hzc.blogapi.controller.RegisterController`
+
+```java
+package com.hzc.blogapi.controller;
+
+import com.hzc.blogapi.service.LoginService;
+import com.hzc.blogapi.vo.Result;
+import com.hzc.blogapi.vo.params.LoginParam;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("register")
+public class RegisterController {
+
+    @Autowired
+    private LoginService loginService;
+
+    @PostMapping
+    public Result register(@RequestBody LoginParam loginParam) {
+        return loginService.register(loginParam);
+    }
+
+}
+```
+
+参数LoginParam中 添加新的参数nickname。
+
+```java
+package com.hzc.blogapi.vo.params;
+
+import lombok.Data;
+
+@Data
+public class LoginParam {
+
+    private String account;
+
+    private String password;
+
+    private String nickname;
+
+}
+```
+
+#### 10.3 Service
+
+`com.hzc.blogapi.service.LoginService`
+
+```java
+/**
+ * 注册
+ */
+Result register(LoginParam loginParam);
+```
+
+实现类：`com.hzc.blogapi.service.impl.LoginServiceImpl`
+
+```java
+@Override
+public Result register(LoginParam loginParam) {
+    String account = loginParam.getAccount();
+    String password = loginParam.getPassword();
+    String nickname = loginParam.getNickname();
+    if(StringUtils.isBlank(account) || StringUtils.isBlank(password) || StringUtils.isBlank(nickname)) {
+        return Result.fail(ErrorCode.PARAMS_ERROR.getCode(), ErrorCode.PARAMS_ERROR.getMsg());
+    }
+    SysUser sysUser = this.sysUserService.findUserByAccount(account);
+    if(sysUser != null) {
+        return Result.fail(ErrorCode.ACCOUNT_EXIST.getCode(), ErrorCode.ACCOUNT_EXIST.getMsg());
+    }
+
+    sysUser = new SysUser();
+    sysUser.setNickname(nickname);
+    sysUser.setAccount(account);
+    sysUser.setPassword(DigestUtils.md5Hex(password + slat));
+    sysUser.setCreateDate(System.currentTimeMillis());
+    sysUser.setLastLogin(System.currentTimeMillis());
+    sysUser.setAvatar("/static/img/logo.b3a48c0.png");
+    sysUser.setAdmin(1);    // 1为true
+    sysUser.setDeleted(0);  // 0 为 false
+    sysUser.setSalt("");
+    sysUser.setStatus("");
+    sysUser.setEmail("");
+    this.sysUserService.save(sysUser);
+
+    // token
+    String token = JWTUtils.createToken(sysUser.getId());
+
+    redisTemplate.opsForValue().set("TOKEN_" + token, JSON.toJSONString(sysUser), 1, TimeUnit.DAYS);
+    return Result.success(token);
+
+}
+```
+
+错误码中补充：`com.hzc.blogapi.vo.ErrorCode`
+
+```java
+ACCOUNT_EXIST(10004,"账号已存在"),
+```
+
+`com.hzc.blogapi.service.SysUserService`
+
+```java
+SysUser findUserByAccount(String account);
+
+void save(SysUser sysUser);
+```
+
+`com.hzc.blogapi.service.impl.SysUserServiceImpl`
+
+```java
+@Override
+public SysUser findUserByAccount(String account) {
+    LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.eq(SysUser::getAccount, account);
+    queryWrapper.last("limit 1");
+    return sysUserMapper.selectOne(queryWrapper);
+}
+
+@Override
+public void save(SysUser sysUser) {
+    // 注意 默认生成的id 是分布式id 采用了雪花算法
+    this.sysUserMapper.insert(sysUser);
+}
+```
+
+#### 10.4 添加事务
+
+`com.hzc.blogapi.service.impl.LoginServiceImpl`
+
+```java
+@Service
+@Transactional
+public class LoginServiceImpl implements LoginService {}
+```
+
+当然 一般建议加在 接口上，通用一些。
+
+测试的时候 可以将redis 停掉，那么redis连接异常后，新添加的用户 应该执行回滚操作。
+
+
+
+
+
+
 
 
 
