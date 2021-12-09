@@ -2964,3 +2964,211 @@ public Result logout(String token) {
 
 
 
+### 13. 登录拦截器
+
+每次访问需要登录的资源的时候，都需要在代码中进行判断，一旦登录的逻辑有所改变，代码都得进行变动，非常不合适。
+
+使用拦截器，可以进行统一登录判断。进行登录拦截，如果遇到需要登录才能访问的接口，如果未登录，拦截器直接返回，并跳转登录页面。
+
+#### 13.1 拦截器实现
+
+添加工具类：`com.hzc.blogapi.utils.UserThreadLocal`
+
+```java
+package com.hzc.blogapi.utils;
+
+import com.hzc.blogapi.dao.pojo.SysUser;
+
+public class UserThreadLocal {
+
+    private UserThreadLocal(){}
+    // 线程变量隔离
+    private static final ThreadLocal<SysUser> LOCAL = new ThreadLocal<>();
+
+    public static void put(SysUser sysUser) {
+        LOCAL.set(sysUser);
+    }
+
+    public static void remove() {
+        LOCAL.remove();
+    }
+
+}
+```
+
+
+
+`com.hzc.blogapi.handler.LoginInterceptor`
+
+```java
+package com.hzc.blogapi.handler;
+
+import com.alibaba.fastjson.JSON;
+import com.hzc.blogapi.dao.pojo.SysUser;
+import com.hzc.blogapi.service.LoginService;
+import com.hzc.blogapi.utils.UserThreadLocal;
+import com.hzc.blogapi.vo.ErrorCode;
+import com.hzc.blogapi.vo.Result;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@Slf4j
+@Component
+public class LoginInterceptor implements HandlerInterceptor {
+
+    @Autowired
+    private LoginService loginService;
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        /**
+         * 在执行controller方法（Handler）之前进行执行
+         * 1. 需要判断 请求的接口路径 是否为 HandlerMethod（controller方法）
+         * 2. 判断 token 是否为空，如果为空 未登录
+         * 3. 如果token 不为空，登录验证 loginService checkToken
+         * 4. 如果认证成功 放行即可
+         */
+        if(!(handler instanceof HandlerMethod)) {
+            // handler 可能是 RequestResourceHandler springboot 程序 访问静态资源 默认去 classpath下的static目标去查询
+            return true;
+        }
+        String token = request.getHeader("Authorization");
+        log.info("======================== request start =============================");
+        String requestURI = request.getRequestURI();
+        log.info("request uri:{}", requestURI);
+        log.info("request method:{}", request.getMethod());
+        log.info("token:{}", token);
+        log.info("========================= request end =====================================");
+
+        if(StringUtils.isBlank(token)) {
+            Result result = Result.fail(ErrorCode.NO_LOGIN.getCode(), "未登录");
+            response.setContentType("application/json;charset=utf-8");
+            response.getWriter().print(JSON.toJSONString(result));
+            return false;
+        }
+        SysUser sysUser = loginService.checkToken(token);
+        if(sysUser == null) {
+            Result result = Result.fail(ErrorCode.NO_LOGIN.getCode(), "未登录");
+            response.setContentType("application/json;charset=utf-8");
+            response.getWriter().print(JSON.toJSONString(result));
+            return false;
+        }
+
+        // 是登录状态，放行
+        // 希望在controller中 直接获取用户的信息 怎么获取？
+        UserThreadLocal.put(sysUser);
+        return true;
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+        UserThreadLocal.remove();
+    }
+
+}
+```
+
+`com.hzc.blogapi.service.impl.LoginServiceImpl`
+
+```java
+@Override
+public SysUser checkToken(String token) {
+    if (StringUtils.isBlank(token)){
+        return null;
+    }
+    Map<String, Object> stringObjectMap = JWTUtils.checkToken(token);
+    if (stringObjectMap == null){
+        return null;
+    }
+    String userJson = redisTemplate.opsForValue().get("TOKEN_" + token);
+    if (StringUtils.isBlank(userJson)){
+        return null;
+    }
+    SysUser sysUser = JSON.parseObject(userJson, SysUser.class);
+    return sysUser;
+}
+```
+
+```java
+SysUser checkToken(String token);
+```
+
+
+
+#### 13.2 使拦截器生效
+
+`com.hzc.blogapi.config.WebConfig`
+
+```java
+package com.hzc.blogapi.config;
+
+import com.hzc.blogapi.handler.LoginInterceptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Autowired
+    private LoginInterceptor loginInterceptor;
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        // 跨域配置，不可设置为*，不安全, 前后端分离项目，可能域名端口不一致
+        registry.addMapping("/**").allowedOrigins("http://localhost:8080");
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(loginInterceptor)
+                .addPathPatterns("/test");
+    }
+
+}
+```
+
+#### 13.3 测试
+
+`com.hzc.blogapi.controller.TestController`
+
+```java
+package com.hzc.blogapi.controller;
+
+import com.hzc.blogapi.dao.pojo.SysUser;
+import com.hzc.blogapi.utils.UserThreadLocal;
+import com.hzc.blogapi.vo.Result;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("test")
+public class TestController {
+
+    @RequestMapping
+    public Result test() {
+        SysUser sysUser = UserThreadLocal.get();
+        System.out.println(sysUser);
+        return Result.success(null);
+    }
+
+}
+```
+
+
+
+
+
+
+
+
+
