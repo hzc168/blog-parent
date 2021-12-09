@@ -1,5 +1,6 @@
 package com.hzc.blogapi.service;
 
+import com.hzc.blogapi.dao.pojo.SysUser;
 import com.hzc.blogapi.vo.Result;
 import com.hzc.blogapi.vo.params.LoginParam;
 
@@ -15,4 +16,5 @@ public interface LoginService {
      * 注册
      */
     Result register(LoginParam loginParam);
+
 }

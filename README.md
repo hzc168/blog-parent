@@ -2673,7 +2673,170 @@ public class LoginServiceImpl implements LoginService {}
 
 
 
+### 11. 获取用户信息
 
+#### 11.1 获取用户信息接口说明
+
+##### 接口描述
+
+##### 请求
+
+- **请求语法**
+
+  ```http
+  GET /users/currentUser HTTP/1.1
+  ```
+
+- **请求头参数**
+
+  > Authorization: "token"
+
+- **请求内容**
+
+  > 无
+
+- **请求内容参数**
+
+  > 无
+
+##### 响应
+
+- **响应内容**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": {
+          "id":1,
+          "account":"1",
+          "nickaname":"1",
+          "avatar":"ss"
+      }
+  }
+  ```
+
+- **响应内容参数**
+
+  > code：类型`int`，状态码，200表示成功；
+
+##### 示例
+
+- **请求示例**
+
+  ```http
+  POST /users/currentUser HTTP/1.1
+  ```
+
+  ```java
+  Authorization: "token"
+  ```
+
+  
+
+- **响应示例**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": {
+          "id":1,
+          "account":"1",
+          "nickaname":"1",
+          "avatar":"ss"
+      }
+  }
+  ```
+
+#### 11.2 Controller
+
+`com.hzc.blogapi.controller.SysUserController`
+
+```java
+package com.hzc.blogapi.controller;
+
+import com.hzc.blogapi.service.SysUserService;
+import com.hzc.blogapi.vo.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("users")
+public class SysUserController {
+
+    @Autowired
+    private SysUserService sysUserService;
+
+    @GetMapping("currentUser")
+    public Result currentUser(@RequestHeader("Authorization") String token) {
+        return sysUserService.findUserByToken(token);
+    }
+
+}
+```
+
+#### 11.3 Service
+
+`com.hzc.blogapi.service.SysUserService`
+
+```java
+Result findUserByToken(String token);
+```
+
+实现类新增：`com.hzc.blogapi.service.impl.SysUserServiceImpl`
+
+```java
+@Override
+public Result getUserInfoByToken(String token) {
+    Map<String, Object> map = JWTUtils.checkToken(token);
+    if(map == null) {
+        return Result.fail(ErrorCode.NO_LOGIN.getCode(), ErrorCode.NO_LOGIN.getMsg());
+    }
+
+    String userJson = redisTemplate.opsForValue().get("TOKEN_" + token);
+    if(StringUtils.isBlank(userJson)) {
+        return Result.fail(ErrorCode.NO_LOGIN.getCode(), ErrorCode.NO_LOGIN.getMsg());
+    }
+
+    SysUser sysUser = JSON.parseObject(userJson, SysUser.class);
+    LoginUserVo loginUserVo = new LoginUserVo();
+    loginUserVo.setAccount(sysUser.getAccount());
+    loginUserVo.setAvatar(sysUser.getAvatar());
+    loginUserVo.setId(sysUser.getId());
+    loginUserVo.setNickname(sysUser.getNickname());
+    return Result.success(loginUserVo);
+
+}
+```
+
+#### 11.4 LoginUserVo
+
+`com.hzc.blogapi.vo.LoginUserVo`
+
+```java
+package com.hzc.blogapi.vo;
+
+import lombok.Data;
+
+@Data
+public class LoginUserVo {
+
+    private Long id;
+
+    private String account;
+
+    private String nickname;
+
+    private String avatar;
+
+}
+```
 
 
 
