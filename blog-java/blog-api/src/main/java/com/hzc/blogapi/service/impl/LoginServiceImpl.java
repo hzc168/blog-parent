@@ -86,4 +86,10 @@ public class LoginServiceImpl implements LoginService {
 
     }
 
+    @Override
+    public Result logout(String token) {
+        redisTemplate.delete("TOKEN_"+token);
+        return Result.success(null);
+    }
+
 }

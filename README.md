@@ -2838,7 +2838,129 @@ public class LoginUserVo {
 }
 ```
 
+### 12. 退出登录
 
+#### 12.1 退出登录接口说明
+
+##### 接口描述
+
+##### 请求
+
+- **请求语法**
+
+  ```http
+  GET /logout HTTP/1.1
+  ```
+
+- **请求参数**
+
+  > Authorization: "token"
+
+- **请求内容**
+
+  > 无
+
+- **请求内容参数**
+
+  > account：类型`string`，账号
+  >
+  > password：类型`string`，密码
+
+##### 响应
+
+- **响应内容**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": null
+  }
+  ```
+
+- **响应内容参数**
+
+  > code：类型`int`，状态码，200表示成功；
+
+##### 示例
+
+- **请求示例**
+
+  ```http
+  GET /logout HTTP/1.1
+  ```
+
+  ```java
+  Authorization: "token"
+  ```
+
+  
+
+- **响应示例**
+
+  ```json
+  {
+      "success": true,
+      "code": 200,
+      "msg": "success",
+      "data": null
+  }
+  ```
+
+  
+
+#### 12.2 Controller
+
+`com.hzc.blogapi.controller.LogoutController`
+
+```java
+package com.hzc.blogapi.controller;
+
+import com.hzc.blogapi.service.LoginService;
+import com.hzc.blogapi.vo.Result;
+import com.hzc.blogapi.vo.params.LoginParam;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("logout")
+public class LogoutController {
+
+    @Autowired
+    private LoginService loginService;
+
+    @GetMapping
+    public Result logout(@RequestHeader("Authorization") String token){
+        return loginService.logout(token);
+    }
+}
+```
+
+#### 12.3 Service
+
+`com.hzc.blogapi.service.LoginService`
+
+```java
+/**
+ * 退出登录
+ * @param token
+ * @return
+ */
+Result logout(String token);
+```
+
+
+
+`com.hzc.blogapi.service.impl.LoginServiceImpl`
+
+```java
+@Override
+public Result logout(String token) {
+    redisTemplate.delete("TOKEN_"+token);
+    return Result.success(null);
+}
+```
 
 
 
